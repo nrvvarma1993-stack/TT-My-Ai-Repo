@@ -1,3 +1,120 @@
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px;
+  background-color: #6b46c1;
+  color: white;
+  margin-bottom: 20px;
+}
+
+.header h1 {
+  margin: 0;
+  font-size: 24px;
+}
+
+.header-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.header-actions button {
+  padding: 10px 20px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: opacity 0.2s;
+}
+
+.header-actions button:hover {
+  opacity: 0.85;
+}
+
+.btn-logout {
+  background-color: #805ad5;
+  color: white;
+}
+
+.btn-import {
+  background-color: #4299e1;
+  color: white;
+}
+
+.btn-new-project {
+  background-color: #48bb78;
+  color: white;
+}
+
+.btn-export {
+  background-color: #805ad5;
+  color: white;
+}
+
+.filters {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  padding: 20px;
+  background-color: #f7fafc;
+  border-radius: 8px;
+  margin-bottom: 20px;
+}
+
+.filters h3 {
+  margin: 0;
+  font-size: 16px;
+  color: #2d3748;
+}
+
+.filters select {
+  padding: 8px 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 6px;
+  font-size: 14px;
+  min-width: 150px;
+  cursor: pointer;
+}
+
+.btn-clear-filters {
+  padding: 8px 16px;
+  background-color: #e53e3e;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.btn-clear-filters:hover {
+  background-color: #c53030;
+}
+
+.btn-edit-project {
+  width: 100%;
+  padding: 10px;
+  margin-top: 15px;
+  background-color: #4299e1;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background-color 0.2s;
+}
+
+.btn-edit-project:hover {
+  background-color: #3182ce;
+}
+
+.projects-section h2 {
+  color: #2d3748;
+  margin-bottom: 20px;
+}
+
 
 /* Global Styles */
 * {
