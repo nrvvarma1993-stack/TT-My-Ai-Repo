@@ -29,6 +29,18 @@ interface TeamStats {
   qualityImpact: number;
 }
 
+interface ImportedProjectData {
+  name: string;
+  description?: string;
+  team: string;
+  status?: string;
+  priority?: string;
+  ahtImpact?: number;
+  costSaving?: number;
+  qualityImpact?: number;
+}
+
+
 function App() {
   // Filter state
   const [filters, setFilters] = useState({
@@ -47,6 +59,12 @@ function App() {
   const [loading, setLoading] = useState(false);
   const [authStatus, setAuthStatus] = useState<string>('Checking...');
 
+  // Add state for import modal
+  const [showImportModal, setShowImportModal] = useState(false);
+  const [importFile, setImportFile] = useState<File | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportedProjectData[]>([]);
+
+  
   // Form data for modals
   const [formData, setFormData] = useState<Partial<Project>>({
     name: '',
@@ -338,22 +356,160 @@ function App() {
     console.log('🔄 Manual refresh triggered');
     await fetchProjects();
   };
+  // Handle Excel/CSV Import
+  const handleImportExcel = () => {
+    setShowImportModal(true);
+  };
 
-  return (
+  // Parse Excel/CSV file
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImportFile(file);
+
+    // Read file content
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      const text = event.target?.result as string;
+      
+      // Parse CSV (simple implementation)
+      if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
+        const lines = text.split('
+');
+        const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+        
+        const projects: ImportedProjectData[] = [];
+        
+        for (let i = 1; i < lines.length; i++) {
+          if (!lines[i].trim()) continue;
+          
+          const values = lines[i].split(',').map(v => v.trim());
+          const project: ImportedProjectData = {
+            name: '',
+            team: '',
+          };
+          
+          headers.forEach((header, index) => {
+            const value = values[index];
+            
+            // Map common column names to project fields
+            if (header.includes('name') || header.includes('project')) {
+              project.name = value;
+            } else if (header.includes('description') || header.includes('desc')) {
+              project.description = value;
+            } else if (header.includes('team') || header.includes('owner')) {
+              project.team = value;
+            } else if (header.includes('status')) {
+              project.status = value;
+            } else if (header.includes('priority')) {
+              project.priority = value;
+            } else if (header.includes('aht')) {
+              project.ahtImpact = parseFloat(value) || 0;
+            } else if (header.includes('cost')) {
+              project.costSaving = parseFloat(value) || 0;
+            } else if (header.includes('quality')) {
+              project.qualityImpact = parseFloat(value) || 0;
+            }
+          });
+          
+          if (project.name && project.team) {
+            projects.push(project);
+          }
+        }
+        
+        setImportPreview(projects);
+      }
+      
+      // For Excel files (.xlsx), you'd need a library like 'xlsx'
+      // Install: npm install xlsx
+      // Then use: import * as XLSX from 'xlsx';
+    };
+    
+    reader.readAsText(file);
+  };
+
+  // Import projects to database
+  const handleConfirmImport = async () => {
+    if (importPreview.length === 0) {
+      alert('No valid projects found in the file');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      console.log(`📥 Importing ${importPreview.length} projects...`);
+
+      // Create all projects
+      for (const projectData of importPreview) {
+        await client.models.Project.create({
+          name: projectData.name,
+          description: projectData.description || '',
+          team: projectData.team,
+          status: projectData.status || 'Not Started',
+          priority: projectData.priority || 'Medium',
+          ahtImpact: projectData.ahtImpact || 0,
+          costSaving: projectData.costSaving || 0,
+          qualityImpact: projectData.qualityImpact || 0,
+        });
+      }
+
+      console.log('✅ All projects imported successfully');
+      alert(`Successfully imported ${importPreview.length} projects!`);
+      
+      // Close modal and refresh
+      setShowImportModal(false);
+      setImportFile(null);
+      setImportPreview([]);
+      await fetchProjects();
+    } catch (error) {
+      console.error('❌ Error importing projects:', error);
+      alert('Failed to import projects. Check console for details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Export current projects to CSV
+  const handleExport = () => {
+    const csvContent = [
+      // Header row
+      'Project Name,Description,Team,Status,Priority,AHT Impact,Cost Saving,Quality Impact',
+      // Data rows
+      ...projects.map(p => 
+        `"${p.name}","${p.description || ''}","${p.team}","${p.status}","${p.priority}",${p.ahtImpact || 0},${p.costSaving || 0},${p.qualityImpact || 0}`
+      )
+    ].join('
+');
+
+    // Create download link
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `ai-projects-export-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+ return (
     <div className="App">
-      {/* Header with Action Buttons */}
+      {/* Header - ALWAYS VISIBLE */}
       <div className="header">
-        <h1>AI Project Tracker</h1>
+        <h1>TT Project Tracker</h1>
         <div className="header-actions">
           <span className="auth-status" style={{ marginRight: '10px', fontSize: '12px' }}>
             {authStatus}
           </span>
           <button className="btn-logout">Logout</button>
-          <button className="btn-import">Import Excel</button>
+          <button className="btn-import" onClick={handleImportExcel}>
+            Import Excel
+          </button>
           <button className="btn-new-project" onClick={handleNewProject}>
             + New Project
           </button>
-          <button className="btn-export">Export</button>
+          <button className="btn-export" onClick={handleExport}>
+            Export
+          </button>
           <button 
             className="btn-refresh" 
             onClick={handleManualRefresh}
@@ -365,7 +521,7 @@ function App() {
         </div>
       </div>
 
-      {/* Loading Indicator */}
+      {/* Loading Indicator - Shows BELOW header */}
       {loading && (
         <div style={{ 
           padding: '10px', 
@@ -376,7 +532,89 @@ function App() {
           ⏳ Loading data...
         </div>
       )}
+   {/* Import Modal */}
+      {showImportModal && (
+        <div className="modal-overlay" onClick={() => setShowImportModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: '800px' }}>
+            <h2>Import Projects from Excel/CSV</h2>
+            
+            <div className="import-instructions" style={{ 
+              background: '#f5f5f5', 
+              padding: '15px', 
+              marginBottom: '20px',
+              borderRadius: '5px'
+            }}>
+              <h4>File Format Requirements:</h4>
+              <p>Your file should have these columns (case-insensitive):</p>
+              <ul style={{ textAlign: 'left', marginLeft: '20px' }}>
+                <li><strong>Name/Project</strong> (required) - Project name</li>
+                <li><strong>Team/Owner</strong> (required) - Team name</li>
+                <li><strong>Description</strong> (optional)</li>
+                <li><strong>Status</strong> (optional) - Not Started, In Progress, Completed, On Hold</li>
+                <li><strong>Priority</strong> (optional) - Low, Medium, High, Critical</li>
+                <li><strong>AHT</strong> (optional) - AHT Impact percentage</li>
+                <li><strong>Cost</strong> (optional) - Cost Saving amount</li>
+                <li><strong>Quality</strong> (optional) - Quality Impact percentage</li>
+              </ul>
+            </div>
 
+            <div className="form-group">
+              <label>Upload CSV or Excel File</label>
+              <input
+                type="file"
+                accept=".csv,.xlsx,.xls,.txt"
+                onChange={handleFileUpload}
+                style={{ width: '100%', padding: '10px' }}
+              />
+            </div>
+
+            {importPreview.length > 0 && (
+              <div className="import-preview" style={{ marginTop: '20px' }}>
+                <h3>Preview ({importPreview.length} projects found)</h3>
+                <div style={{ maxHeight: '300px', overflowY: 'auto', border: '1px solid #ddd', padding: '10px' }}>
+                  <table style={{ width: '100%', fontSize: '12px' }}>
+                    <thead>
+                      <tr>
+                        <th>Name</th>
+                        <th>Team</th>
+                        <th>Status</th>
+                        <th>Priority</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importPreview.map((project, index) => (
+                        <tr key={index}>
+                          <td>{project.name}</td>
+                          <td>{project.team}</td>
+                          <td>{project.status || 'Not Started'}</td>
+                          <td>{project.priority || 'Medium'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="modal-actions" style={{ marginTop: '20px' }}>
+              <button type="button" onClick={() => setShowImportModal(false)}>
+                Cancel
+              </button>
+              <button 
+                type="button" 
+                onClick={handleConfirmImport}
+                disabled={importPreview.length === 0 || loading}
+                style={{ 
+                  background: importPreview.length > 0 ? '#4CAF50' : '#ccc',
+                  cursor: importPreview.length > 0 ? 'pointer' : 'not-allowed'
+                }}
+              >
+                {loading ? 'Importing...' : `Import ${importPreview.length} Projects`}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {/* Filters Section */}
       <div className="filters">
         <h3>Filters:</h3>
