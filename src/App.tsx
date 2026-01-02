@@ -23,7 +23,7 @@ function App() {
   const completed = projects.filter(p => p.status === "Completed").length;
   const onHold = projects.filter(p => p.status === "On Hold").length;
   const totalCostSaving = projects.reduce((sum, p) => sum + (p.costSaving || 0), 0);
-  const totalAITImpact = projects.reduce((sum, p) => sum + (p.aitImpact || 0), 0);
+  const totalahtImpact = projects.reduce((sum, p) => sum + (p.ahtImpact || 0), 0);
   const avgQualityImpact = projects.length > 0 
     ? projects.reduce((sum, p) => sum + (p.qualityImpact || 0), 0) / projects.length 
     : 0;
@@ -37,7 +37,7 @@ function App() {
         notStarted: 0,
         inProgress: 0,
         completed: 0,
-        aitImpact: 0,
+        ahtImpact: 0,
         costSaving: 0,
         qualityImpact: 0
       };
@@ -46,7 +46,7 @@ function App() {
     if (project.status === "Not Started") acc[team].notStarted++;
     if (project.status === "In Progress") acc[team].inProgress++;
     if (project.status === "Completed") acc[team].completed++;
-    acc[team].aitImpact += project.aitImpact || 0;
+    acc[team].ahtImpact += project.ahtImpact || 0;
     acc[team].costSaving += project.costSaving || 0;
     acc[team].qualityImpact += project.qualityImpact || 0;
     return acc;
@@ -88,7 +88,7 @@ function App() {
           <div className="metric-label">On Hold</div>
         </div>
         <div className="metric-card teal">
-          <div className="metric-value">{totalAITImpact.toFixed(1)}m</div>
+          <div className="metric-value">{totalahtImpact.toFixed(1)}m</div>
           <div className="metric-label">AIT Impact</div>
         </div>
         <div className="metric-card green-large">
@@ -153,7 +153,7 @@ function App() {
                   <td>{stats.notStarted}</td>
                   <td>{stats.inProgress}</td>
                   <td>{stats.completed}</td>
-                  <td>{stats.aitImpact.toFixed(1)}%</td>
+                  <td>{stats.ahtImpact.toFixed(1)}%</td>
                   <td>${stats.costSaving.toLocaleString()}</td>
                   <td>{stats.qualityImpact.toFixed(1)}%</td>
                   <td>
@@ -193,7 +193,7 @@ function App() {
                 <div className="project-metrics">
                   <div className="metric-item">
                     <span className="metric-label">AIT Impact:</span>
-                    <span className="metric-value">{project.aitImpact}%</span>
+                    <span className="metric-value">{project.ahtImpact}%</span>
                   </div>
                   <div className="metric-item">
                     <span className="metric-label">Cost Saving:</span>
