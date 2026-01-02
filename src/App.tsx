@@ -1,38 +1,78 @@
 
-import { generateClient } from "aws-amplify/data";
-import type { Schema } from "../amplify/data/resource";
-import { useEffect, useState } from "react";
-import "./App.css";
+import { useState, useEffect } from 'react';
+import './App.css';
 
-const client = generateClient<Schema>();
+// Import modal components (you'll create these separately)
+import EditProjectModal from './EditProjectModal';
+import NewProjectModal from './NewProjectModal';
+
+interface Project {
+  id: number;
+  name: string;
+  description: string;
+  team: string;
+  status: string;
+  priority: string;
+  ahtImpact?: number;
+  costSaving?: number;
+  qualityImpact?: number;
+}
+
+interface TeamStats {
+  totalProjects: number;
+  notStarted: number;
+  inProgress: number;
+  completed: number;
+  ahtImpact: number;
+  costSaving: number;
+  qualityImpact: number;
+}
 
 function App() {
-  const [projects, setProjects] = useState<Array<Schema["Project"]["type"]>>([]);
+  // Filter state
+  const [filters, setFilters] = useState({
+    team: '',
+    status: '',
+    priority: ''
+  });
+  
+  // Modal state
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [showNewModal, setShowNewModal] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  
+  // Your existing projects data (replace with your actual data)
+  const [projects, setProjects] = useState<Project[]>([
+    {
+      id: 1,
+      name: "AI Chatbot Implementation",
+      description: "Develop an AI-powered chatbot for customer support",
+      team: "Engineering",
+      status: "In Progress",
+      priority: "High"
+    },
+    {
+      id: 2,
+      name: "Predictive Analytics Dashboard",
+      description: "Create a dashboard for predictive analytics",
+      team: "Data Science",
+      status: "Completed",
+      priority: "Medium",
+      ahtImpact: 15.5,
+      costSaving: 50000,
+      qualityImpact: 12.3
+    },
+    // Add your other projects here
+  ]);
 
-  useEffect(() => {
-    // Fetch AI Projects
-    client.models.Project.observeQuery().subscribe({
-      next: (data) => setProjects([...data.items]),
-    });
-  }, []);
+  // Filtered projects state
+  const [filteredProjects, setFilteredProjects] = useState<Project[]>(projects);
 
-  // Calculate metrics
-  const totalProjects = projects.length;
-  const notStarted = projects.filter(p => p.status === "Not Started").length;
-  const inProgress = projects.filter(p => p.status === "In Progress").length;
-  const completed = projects.filter(p => p.status === "Completed").length;
-  const onHold = projects.filter(p => p.status === "On Hold").length;
-  const totalCostSaving = projects.reduce((sum, p) => sum + (p.costSaving || 0), 0);
-  const totalahtImpact = projects.reduce((sum, p) => sum + (p.ahtImpact || 0), 0);
-  const avgQualityImpact = projects.length > 0 
-    ? projects.reduce((sum, p) => sum + (p.qualityImpact || 0), 0) / projects.length 
-    : 0;
-
-  // Group projects by team
-  const teamStats = projects.reduce((acc, project) => {
-    const team = project.team || "Unassigned";
-    if (!acc[team]) {
-      acc[team] = {
+  // Calculate team stats from projects
+  const teamStats: Record<string, TeamStats> = {};
+  projects.forEach(project => {
+    if (!teamStats[project.team]) {
+      teamStats[project.team] = {
         totalProjects: 0,
         notStarted: 0,
         inProgress: 0,
@@ -42,86 +82,160 @@ function App() {
         qualityImpact: 0
       };
     }
-    acc[team].totalProjects++;
-    if (project.status === "Not Started") acc[team].notStarted++;
-    if (project.status === "In Progress") acc[team].inProgress++;
-    if (project.status === "Completed") acc[team].completed++;
-    acc[team].ahtImpact += project.ahtImpact || 0;
-    acc[team].costSaving += project.costSaving || 0;
-    acc[team].qualityImpact += project.qualityImpact || 0;
-    return acc;
-  }, {} as Record<string, any>);
+    
+    const stats = teamStats[project.team];
+    stats.totalProjects++;
+    
+    if (project.status === "Not Started") stats.notStarted++;
+    if (project.status === "In Progress") stats.inProgress++;
+    if (project.status === "Completed") {
+      stats.completed++;
+      stats.ahtImpact += project.ahtImpact || 0;
+      stats.costSaving += project.costSaving || 0;
+      stats.qualityImpact += project.qualityImpact || 0;
+    }
+  });
+
+  // Apply filters whenever filters or projects change
+  useEffect(() => {
+    let filtered = [...projects];
+
+    if (filters.team) {
+      filtered = filtered.filter(project => project.team === filters.team);
+    }
+    if (filters.status) {
+      filtered = filtered.filter(project => project.status === filters.status);
+    }
+    if (filters.priority) {
+      filtered = filtered.filter(project => project.priority === filters.priority);
+    }
+
+    setFilteredProjects(filtered);
+  }, [filters, projects]);
+
+  // Filter handler
+  const handleFilterChange = (filterType: string, value: string) => {
+    setFilters(prev => ({
+      ...prev,
+      [filterType]: value
+    }));
+  };
+
+  // Clear all filters
+  const clearFilters = () => {
+    setFilters({
+      team: '',
+      status: '',
+      priority: ''
+    });
+  };
+
+  // Edit handler
+  const handleEdit = (project: Project) => {
+    setSelectedProject(project);
+    setShowEditModal(true);
+  };
+
+  // New project handler
+  const handleNewProject = () => {
+    setShowNewModal(true);
+  };
+
+  // Save edited project
+  const handleSaveEdit = (updatedProject: Project) => {
+    setProjects(prev => 
+      prev.map(p => p.id === updatedProject.id ? updatedProject : p)
+    );
+    setShowEditModal(false);
+  };
+
+  // Save new project
+  const handleSaveNew = (newProject: Project) => {
+    setProjects(prev => [...prev, { ...newProject, id: Date.now() }]);
+    setShowNewModal(false);
+  };
+
+  // Calculate filtered team stats
+  const filteredTeamStats: Record<string, TeamStats> = {};
+  filteredProjects.forEach(project => {
+    if (!filteredTeamStats[project.team]) {
+      filteredTeamStats[project.team] = {
+        totalProjects: 0,
+        notStarted: 0,
+        inProgress: 0,
+        completed: 0,
+        ahtImpact: 0,
+        costSaving: 0,
+        qualityImpact: 0
+      };
+    }
+    
+    const stats = filteredTeamStats[project.team];
+    stats.totalProjects++;
+    
+    if (project.status === "Not Started") stats.notStarted++;
+    if (project.status === "In Progress") stats.inProgress++;
+    if (project.status === "Completed") {
+      stats.completed++;
+      stats.ahtImpact += project.ahtImpact || 0;
+      stats.costSaving += project.costSaving || 0;
+      stats.qualityImpact += project.qualityImpact || 0;
+    }
+  });
 
   return (
-    <div className="dashboard-container">
-      {/* Header */}
-      <header className="dashboard-header">
-        <h1>GEN AI Project Management</h1>
+    <div className="App">
+      {/* Header with Action Buttons */}
+      <div className="header">
+        <h1>AI Project Tracker</h1>
         <div className="header-actions">
-          <button className="btn-secondary">Logout</button>
-          <button className="btn-secondary">Import Excel</button>
-          <button className="btn-primary">+ New Project</button>
-          <button className="btn-secondary">Export</button>
-        </div>
-      </header>
-
-      {/* Metrics Grid */}
-      <div className="metrics-grid">
-        <div className="metric-card blue">
-          <div className="metric-value">{totalProjects}</div>
-          <div className="metric-label">Total Projects</div>
-        </div>
-        <div className="metric-card yellow">
-          <div className="metric-value">{inProgress}</div>
-          <div className="metric-label">In Progress</div>
-        </div>
-        <div className="metric-card green">
-          <div className="metric-value">{completed}</div>
-          <div className="metric-label">Completed</div>
-        </div>
-        <div className="metric-card gray">
-          <div className="metric-value">{notStarted}</div>
-          <div className="metric-label">Not Started</div>
-        </div>
-        <div className="metric-card red">
-          <div className="metric-value">{onHold}</div>
-          <div className="metric-label">On Hold</div>
-        </div>
-        <div className="metric-card teal">
-          <div className="metric-value">{totalahtImpact.toFixed(1)}%</div>
-          <div className="metric-label">AHT Impact</div>
-        </div>
-        <div className="metric-card green-large">
-          <div className="metric-value">${totalCostSaving.toLocaleString()}</div>
-          <div className="metric-label">Cost Saving</div>
-        </div>
-        <div className="metric-card blue-small">
-          <div className="metric-value">{avgQualityImpact.toFixed(1)}%</div>
-          <div className="metric-label">Quality Impact</div>
+          <button className="btn-logout">Logout</button>
+          <button className="btn-import">Import Excel</button>
+          <button className="btn-new-project" onClick={handleNewProject}>
+            + New Project
+          </button>
+          <button className="btn-export">Export</button>
         </div>
       </div>
 
-      {/* Filters */}
+      {/* Filters Section */}
       <div className="filters">
-        <select className="filter-select">
-          <option>All Status</option>
-          <option>Not Started</option>
-          <option>In Progress</option>
-          <option>Completed</option>
-          <option>On Hold</option>
-        </select>
-        <select className="filter-select">
-          <option>All Priority</option>
-          <option>High</option>
-          <option>Medium</option>
-          <option>Low</option>
-        </select>
-        <select className="filter-select">
-          <option>All Teams</option>
+        <h3>Filters:</h3>
+        <select
+          value={filters.team}
+          onChange={(e) => handleFilterChange('team', e.target.value)}
+        >
+          <option value="">All Teams</option>
           {Object.keys(teamStats).map(team => (
-            <option key={team}>{team}</option>
+            <option key={team} value={team}>{team}</option>
           ))}
         </select>
+
+        <select
+          value={filters.status}
+          onChange={(e) => handleFilterChange('status', e.target.value)}
+        >
+          <option value="">All Status</option>
+          <option value="Not Started">Not Started</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Completed">Completed</option>
+          <option value="On Hold">On Hold</option>
+        </select>
+
+        <select
+          value={filters.priority}
+          onChange={(e) => handleFilterChange('priority', e.target.value)}
+        >
+          <option value="">All Priorities</option>
+          <option value="Low">Low</option>
+          <option value="Medium">Medium</option>
+          <option value="High">High</option>
+          <option value="Critical">Critical</option>
+        </select>
+
+        <button className="btn-clear-filters" onClick={clearFilters}>
+          Clear Filters
+        </button>
       </div>
 
       {/* Team Progress Overview Table */}
@@ -130,7 +244,7 @@ function App() {
         <table className="progress-table">
           <thead>
             <tr>
-              <th>Team (Unassigned)</th>
+              <th>Team</th>
               <th>Total Projects</th>
               <th>Not Started</th>
               <th>In Progress</th>
@@ -142,7 +256,7 @@ function App() {
             </tr>
           </thead>
           <tbody>
-            {Object.entries(teamStats).map(([team, stats]: [string, any]) => {
+            {Object.entries(filteredTeamStats).map(([team, stats]) => {
               const progress = stats.totalProjects > 0 
                 ? ((stats.completed / stats.totalProjects) * 100).toFixed(0) 
                 : 0;
@@ -174,9 +288,9 @@ function App() {
 
       {/* AI Projects Section */}
       <div className="projects-section">
-        <h2>AI Projects</h2>
+        <h2>AI Projects ({filteredProjects.length})</h2>
         <div className="projects-grid">
-          {projects.map((project) => (
+          {filteredProjects.map((project) => (
             <div key={project.id} className="project-card">
               <div className="project-header">
                 <h3>{project.name}</h3>
@@ -189,6 +303,15 @@ function App() {
                 <span className="project-team">Team: {project.team}</span>
                 <span className="project-priority">Priority: {project.priority}</span>
               </div>
+              
+              {/* Edit Button */}
+              <button 
+                className="btn-edit-project"
+                onClick={() => handleEdit(project)}
+              >
+                Edit Project
+              </button>
+
               {project.status === "Completed" && (
                 <div className="project-metrics">
                   <div className="metric-item">
@@ -209,6 +332,22 @@ function App() {
           ))}
         </div>
       </div>
+
+      {/* Modals */}
+      {showEditModal && selectedProject && (
+        <EditProjectModal
+          project={selectedProject}
+          onClose={() => setShowEditModal(false)}
+          onSave={handleSaveEdit}
+        />
+      )}
+
+      {showNewModal && (
+        <NewProjectModal
+          onClose={() => setShowNewModal(false)}
+          onSave={handleSaveNew}
+        />
+      )}
     </div>
   );
 }
