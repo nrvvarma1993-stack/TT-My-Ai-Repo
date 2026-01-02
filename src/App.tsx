@@ -88,8 +88,8 @@ function App() {
           <div className="metric-label">On Hold</div>
         </div>
         <div className="metric-card teal">
-          <div className="metric-value">{totalahtImpact.toFixed(1)}m</div>
-          <div className="metric-label">AIT Impact</div>
+          <div className="metric-value">{totalahtImpact.toFixed(1)}%</div>
+          <div className="metric-label">AHT Impact</div>
         </div>
         <div className="metric-card green-large">
           <div className="metric-value">${totalCostSaving.toLocaleString()}</div>
@@ -135,7 +135,7 @@ function App() {
               <th>Not Started</th>
               <th>In Progress</th>
               <th>Completed</th>
-              <th>AIT Impact</th>
+              <th>AHT Impact</th>
               <th>Cost Saving</th>
               <th>Quality Impact</th>
               <th>Progress</th>
@@ -192,7 +192,7 @@ function App() {
               {project.status === "Completed" && (
                 <div className="project-metrics">
                   <div className="metric-item">
-                    <span className="metric-label">AIT Impact:</span>
+                    <span className="metric-label">AHT Impact:</span>
                     <span className="metric-value">{project.ahtImpact}%</span>
                   </div>
                   <div className="metric-item">
