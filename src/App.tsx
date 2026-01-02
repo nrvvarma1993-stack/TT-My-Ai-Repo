@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { generateClient } from 'aws-amplify/data';
 import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
@@ -375,8 +374,8 @@ function App() {
       
       // Parse CSV (simple implementation)
       if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
-        const lines = text.split('
-');
+        // Use a regex to split lines that handles CRLF and LF
+        const lines = text.split(/\r?\n/);
         const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
         
         const projects: ImportedProjectData[] = [];
@@ -479,8 +478,7 @@ function App() {
       ...projects.map(p => 
         `"${p.name}","${p.description || ''}","${p.team}","${p.status}","${p.priority}",${p.ahtImpact || 0},${p.costSaving || 0},${p.qualityImpact || 0}`
       )
-    ].join('
-');
+    ].join('\n');
 
     // Create download link
     const blob = new Blob([csvContent], { type: 'text/csv' });
@@ -957,4 +955,3 @@ function App() {
 }
 
 export default App;
-
