@@ -2,10 +2,6 @@
 import { useState, useEffect } from 'react';
 import './App.css';
 
-// Import modal components (you'll create these separately)
-import EditProjectModal from './EditProjectModal';
-import NewProjectModal from './NewProjectModal';
-
 interface Project {
   id: number;
   name: string;
@@ -41,13 +37,13 @@ function App() {
   const [showNewModal, setShowNewModal] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   
-  // Your existing projects data (replace with your actual data)
+  // Projects data
   const [projects, setProjects] = useState<Project[]>([
     {
       id: 1,
       name: "AI Chatbot Implementation",
       description: "Develop an AI-powered chatbot for customer support",
-      team: "Engineering",
+      team: "Gopi",
       status: "In Progress",
       priority: "High"
     },
@@ -55,46 +51,71 @@ function App() {
       id: 2,
       name: "Predictive Analytics Dashboard",
       description: "Create a dashboard for predictive analytics",
-      team: "Data Science",
+      team: "Vineetha",
       status: "Completed",
       priority: "Medium",
       ahtImpact: 15.5,
       costSaving: 50000,
       qualityImpact: 12.3
     },
-    // Add your other projects here
+    {
+      id: 3,
+      name: "Automated Quality Checks",
+      description: "Implement automated quality assurance system",
+      team: "Sunil",
+      status: "Not Started",
+      priority: "High"
+    }
   ]);
+
+  // Form data for modals
+  const [formData, setFormData] = useState<Partial<Project>>({
+    name: '',
+    description: '',
+    team: '',
+    status: 'Not Started',
+    priority: 'Medium',
+    ahtImpact: 0,
+    costSaving: 0,
+    qualityImpact: 0
+  });
 
   // Filtered projects state
   const [filteredProjects, setFilteredProjects] = useState<Project[]>(projects);
 
   // Calculate team stats from projects
-  const teamStats: Record<string, TeamStats> = {};
-  projects.forEach(project => {
-    if (!teamStats[project.team]) {
-      teamStats[project.team] = {
-        totalProjects: 0,
-        notStarted: 0,
-        inProgress: 0,
-        completed: 0,
-        ahtImpact: 0,
-        costSaving: 0,
-        qualityImpact: 0
-      };
-    }
-    
-    const stats = teamStats[project.team];
-    stats.totalProjects++;
-    
-    if (project.status === "Not Started") stats.notStarted++;
-    if (project.status === "In Progress") stats.inProgress++;
-    if (project.status === "Completed") {
-      stats.completed++;
-      stats.ahtImpact += project.ahtImpact || 0;
-      stats.costSaving += project.costSaving || 0;
-      stats.qualityImpact += project.qualityImpact || 0;
-    }
-  });
+  const calculateTeamStats = (projectList: Project[]): Record<string, TeamStats> => {
+    const stats: Record<string, TeamStats> = {};
+    projectList.forEach(project => {
+      if (!stats[project.team]) {
+        stats[project.team] = {
+          totalProjects: 0,
+          notStarted: 0,
+          inProgress: 0,
+          completed: 0,
+          ahtImpact: 0,
+          costSaving: 0,
+          qualityImpact: 0
+        };
+      }
+      
+      const teamStat = stats[project.team];
+      teamStat.totalProjects++;
+      
+      if (project.status === "Not Started") teamStat.notStarted++;
+      if (project.status === "In Progress") teamStat.inProgress++;
+      if (project.status === "Completed") {
+        teamStat.completed++;
+        teamStat.ahtImpact += project.ahtImpact || 0;
+        teamStat.costSaving += project.costSaving || 0;
+        teamStat.qualityImpact += project.qualityImpact || 0;
+      }
+    });
+    return stats;
+  };
+
+  const teamStats = calculateTeamStats(projects);
+  const filteredTeamStats = calculateTeamStats(filteredProjects);
 
   // Apply filters whenever filters or projects change
   useEffect(() => {
@@ -133,55 +154,54 @@ function App() {
   // Edit handler
   const handleEdit = (project: Project) => {
     setSelectedProject(project);
+    setFormData(project);
     setShowEditModal(true);
   };
 
   // New project handler
   const handleNewProject = () => {
+    setFormData({
+      name: '',
+      description: '',
+      team: '',
+      status: 'Not Started',
+      priority: 'Medium',
+      ahtImpact: 0,
+      costSaving: 0,
+      qualityImpact: 0
+    });
     setShowNewModal(true);
   };
 
+  // Form change handler
+  const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: name === 'ahtImpact' || name === 'costSaving' || name === 'qualityImpact' 
+        ? parseFloat(value) || 0 
+        : value
+    }));
+  };
+
   // Save edited project
-  const handleSaveEdit = (updatedProject: Project) => {
-    setProjects(prev => 
-      prev.map(p => p.id === updatedProject.id ? updatedProject : p)
-    );
-    setShowEditModal(false);
+  const handleSaveEdit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (selectedProject) {
+      setProjects(prev => 
+        prev.map(p => p.id === selectedProject.id ? { ...formData, id: selectedProject.id } as Project : p)
+      );
+      setShowEditModal(false);
+    }
   };
 
   // Save new project
-  const handleSaveNew = (newProject: Project) => {
-    setProjects(prev => [...prev, { ...newProject, id: Date.now() }]);
+  const handleSaveNew = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newProject = { ...formData, id: Date.now() } as Project;
+    setProjects(prev => [...prev, newProject]);
     setShowNewModal(false);
   };
-
-  // Calculate filtered team stats
-  const filteredTeamStats: Record<string, TeamStats> = {};
-  filteredProjects.forEach(project => {
-    if (!filteredTeamStats[project.team]) {
-      filteredTeamStats[project.team] = {
-        totalProjects: 0,
-        notStarted: 0,
-        inProgress: 0,
-        completed: 0,
-        ahtImpact: 0,
-        costSaving: 0,
-        qualityImpact: 0
-      };
-    }
-    
-    const stats = filteredTeamStats[project.team];
-    stats.totalProjects++;
-    
-    if (project.status === "Not Started") stats.notStarted++;
-    if (project.status === "In Progress") stats.inProgress++;
-    if (project.status === "Completed") {
-      stats.completed++;
-      stats.ahtImpact += project.ahtImpact || 0;
-      stats.costSaving += project.costSaving || 0;
-      stats.qualityImpact += project.qualityImpact || 0;
-    }
-  });
 
   return (
     <div className="App">
@@ -304,7 +324,6 @@ function App() {
                 <span className="project-priority">Priority: {project.priority}</span>
               </div>
               
-              {/* Edit Button */}
               <button 
                 className="btn-edit-project"
                 onClick={() => handleEdit(project)}
@@ -333,20 +352,204 @@ function App() {
         </div>
       </div>
 
-      {/* Modals */}
-      {showEditModal && selectedProject && (
-        <EditProjectModal
-          project={selectedProject}
-          onClose={() => setShowEditModal(false)}
-          onSave={handleSaveEdit}
-        />
+      {/* Edit Modal */}
+      {showEditModal && (
+        <div className="modal-overlay" onClick={() => setShowEditModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Edit Project</h2>
+            <form onSubmit={handleSaveEdit}>
+              <div className="form-group">
+                <label>Project Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name || ''}
+                  onChange={handleFormChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Description</label>
+                <textarea
+                  name="description"
+                  value={formData.description || ''}
+                  onChange={handleFormChange}
+                  rows={4}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Team *</label>
+                <select
+                  name="team"
+                  value={formData.team || ''}
+                  onChange={handleFormChange}
+                  required
+                >
+                  <option value="">Select Team</option>
+                  <option value="Gopi">Gopi</option>
+                  <option value="Vineetha">Vineetha</option>
+                  <option value="Sunil">Sunil</option>
+                  <option value="Arman">Arman</option>
+                  <option value="Naveen">Naveen</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Status *</label>
+                <select
+                  name="status"
+                  value={formData.status || ''}
+                  onChange={handleFormChange}
+                  required
+                >
+                  <option value="Not Started">Not Started</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="On Hold">On Hold</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Priority *</label>
+                <select
+                  name="priority"
+                  value={formData.priority || ''}
+                  onChange={handleFormChange}
+                  required
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+
+              {formData.status === "Completed" && (
+                <>
+                  <div className="form-group">
+                    <label>AHT Impact (%)</label>
+                    <input
+                      type="number"
+                      name="ahtImpact"
+                      value={formData.ahtImpact || ''}
+                      onChange={handleFormChange}
+                      step="0.1"
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Cost Saving ($)</label>
+                    <input
+                      type="number"
+                      name="costSaving"
+                      value={formData.costSaving || ''}
+                      onChange={handleFormChange}
+                    />
+                  </div>
+
+                  <div className="form-group">
+                    <label>Quality Impact (%)</label>
+                    <input
+                      type="number"
+                      name="qualityImpact"
+                      value={formData.qualityImpact || ''}
+                      onChange={handleFormChange}
+                      step="0.1"
+                    />
+                  </div>
+                </>
+              )}
+
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowEditModal(false)}>Cancel</button>
+                <button type="submit">Save Changes</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
+      {/* New Project Modal */}
       {showNewModal && (
-        <NewProjectModal
-          onClose={() => setShowNewModal(false)}
-          onSave={handleSaveNew}
-        />
+        <div className="modal-overlay" onClick={() => setShowNewModal(false)}>
+          <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+            <h2>Create New Project</h2>
+            <form onSubmit={handleSaveNew}>
+              <div className="form-group">
+                <label>Project Name *</label>
+                <input
+                  type="text"
+                  name="name"
+                  value={formData.name || ''}
+                  onChange={handleFormChange}
+                  required
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Description</label>
+                <textarea
+                  name="description"
+                  value={formData.description || ''}
+                  onChange={handleFormChange}
+                  rows={4}
+                />
+              </div>
+
+              <div className="form-group">
+                <label>Team *</label>
+                <select
+                  name="team"
+                  value={formData.team || ''}
+                  onChange={handleFormChange}
+                  required
+                >
+                  <option value="">Select Team</option>
+                  <option value="Gopi">Gopi</option>
+                  <option value="Vineetha">Vineetha</option>
+                  <option value="Sunil">Sunil</option>
+                  <option value="Arman">Arman</option>
+                  <option value="Naveen">Naveen</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Status</label>
+                <select
+                  name="status"
+                  value={formData.status || ''}
+                  onChange={handleFormChange}
+                >
+                  <option value="Not Started">Not Started</option>
+                  <option value="In Progress">In Progress</option>
+                  <option value="Completed">Completed</option>
+                  <option value="On Hold">On Hold</option>
+                </select>
+              </div>
+
+              <div className="form-group">
+                <label>Priority</label>
+                <select
+                  name="priority"
+                  value={formData.priority || ''}
+                  onChange={handleFormChange}
+                >
+                  <option value="Low">Low</option>
+                  <option value="Medium">Medium</option>
+                  <option value="High">High</option>
+                  <option value="Critical">Critical</option>
+                </select>
+              </div>
+
+              <div className="modal-actions">
+                <button type="button" onClick={() => setShowNewModal(false)}>Cancel</button>
+                <button type="submit">Create Project</button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
