@@ -17,7 +17,9 @@ const schema = a.schema({
     priority: a.string(), // "High", "Medium", "Low"
     description: a.string(),
   })
-  .authorization(allow => [allow.publicApiKey()]),
+.authorization((allow) => [
+  allow.publicApiKey().to(['create', 'read', 'update', 'delete']),
+]),
 });
 
 export type Schema = ClientSchema<typeof schema>;
