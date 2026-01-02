@@ -1,9 +1,14 @@
 
 import { useState, useEffect } from 'react';
+import { generateClient } from 'aws-amplify/data';
+import { getCurrentUser, fetchAuthSession } from 'aws-amplify/auth';
+import type { Schema } from '../amplify/data/resource';
 import './App.css';
 
+const client = generateClient<Schema>();
+
 interface Project {
-  id: number;
+  id: string;
   name: string;
   description: string;
   team: string;
@@ -38,35 +43,9 @@ function App() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
   
   // Projects data
-  const [projects, setProjects] = useState<Project[]>([
-    {
-      id: 1,
-      name: "AI Chatbot Implementation",
-      description: "Develop an AI-powered chatbot for customer support",
-      team: "Gopi",
-      status: "In Progress",
-      priority: "High"
-    },
-    {
-      id: 2,
-      name: "Predictive Analytics Dashboard",
-      description: "Create a dashboard for predictive analytics",
-      team: "Vineetha",
-      status: "Completed",
-      priority: "Medium",
-      ahtImpact: 15.5,
-      costSaving: 50000,
-      qualityImpact: 12.3
-    },
-    {
-      id: 3,
-      name: "Automated Quality Checks",
-      description: "Implement automated quality assurance system",
-      team: "Sunil",
-      status: "Not Started",
-      priority: "High"
-    }
-  ]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [authStatus, setAuthStatus] = useState<string>('Checking...');
 
   // Form data for modals
   const [formData, setFormData] = useState<Partial<Project>>({
@@ -82,6 +61,96 @@ function App() {
 
   // Filtered projects state
   const [filteredProjects, setFilteredProjects] = useState<Project[]>(projects);
+
+  // Check authentication status
+  const checkAuthStatus = async () => {
+    try {
+      const user = await getCurrentUser();
+      const session = await fetchAuthSession();
+      console.log('✅ Authenticated user:', user.username);
+      console.log('✅ Auth tokens:', session.tokens ? 'Valid' : 'Missing');
+      setAuthStatus(`Logged in as: ${user.username}`);
+      return true;
+    } catch (error) {
+      console.error('❌ Authentication error:', error);
+      setAuthStatus('Not authenticated');
+      return false;
+    }
+  };
+
+  // Fetch all projects from backend
+  const fetchProjects = async () => {
+    try {
+      setLoading(true);
+      console.log('📥 Fetching projects from backend...');
+      const { data, errors } = await client.models.Project.list();
+      
+      if (errors) {
+        console.error('❌ Fetch errors:', errors);
+        return;
+      }
+
+      console.log('✅ Fetched projects:', data.length);
+      setProjects(data as Project[]);
+    } catch (error) {
+      console.error('❌ Error fetching projects:', error);
+      alert('Failed to load projects. Check console for details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Initial setup: Check auth and load projects with real-time subscriptions
+  useEffect(() => {
+    const initializeApp = async () => {
+      const isAuthenticated = await checkAuthStatus();
+      if (isAuthenticated) {
+        await fetchProjects();
+      }
+    };
+
+    initializeApp();
+
+    // Set up real-time subscriptions
+    console.log('🔌 Setting up real-time subscriptions...');
+
+    // Subscribe to new projects
+    const createSub = client.models.Project.onCreate().subscribe({
+      next: (data) => {
+        console.log('🆕 New project created:', data);
+        setProjects((prev) => [...prev, data as Project]);
+      },
+      error: (error) => console.error('❌ Create subscription error:', error)
+    });
+
+    // Subscribe to project updates
+    const updateSub = client.models.Project.onUpdate().subscribe({
+      next: (data) => {
+        console.log('✏️ Project updated:', data);
+        setProjects((prev) =>
+          prev.map((project) => (project.id === data.id ? data as Project : project))
+        );
+      },
+      error: (error) => console.error('❌ Update subscription error:', error)
+    });
+
+    // Subscribe to project deletions
+    const deleteSub = client.models.Project.onDelete().subscribe({
+      next: (data) => {
+        console.log('🗑️ Project deleted:', data);
+        setProjects((prev) => prev.filter((project) => project.id !== data.id));
+      },
+      error: (error) => console.error('❌ Delete subscription error:', error)
+    });
+
+    // Cleanup subscriptions on unmount
+    return () => {
+      console.log('🔌 Cleaning up subscriptions...');
+      createSub.unsubscribe();
+      updateSub.unsubscribe();
+      deleteSub.unsubscribe();
+    };
+  }, []);
 
   // Calculate team stats from projects
   const calculateTeamStats = (projectList: Project[]): Record<string, TeamStats> => {
@@ -184,23 +253,90 @@ function App() {
     }));
   };
 
-  // Save edited project
-  const handleSaveEdit = (e: React.FormEvent) => {
+  // Save edited project with auto-refresh
+  const handleSaveEdit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedProject) {
-      setProjects(prev => 
-        prev.map(p => p.id === selectedProject.id ? { ...formData, id: selectedProject.id } as Project : p)
-      );
+    if (!selectedProject) return;
+
+    try {
+      setLoading(true);
+      console.log('✏️ Updating project:', selectedProject.id);
+      
+      const { data, errors } = await client.models.Project.update({
+        id: selectedProject.id,
+        name: formData.name,
+        description: formData.description,
+        team: formData.team,
+        status: formData.status,
+        priority: formData.priority,
+        ahtImpact: formData.ahtImpact,
+        costSaving: formData.costSaving,
+        qualityImpact: formData.qualityImpact
+      });
+
+      if (errors) {
+        console.error('❌ Update errors:', errors);
+        alert('Failed to update project. Check console for details.');
+        return;
+      }
+
+      console.log('✅ Project updated successfully:', data);
       setShowEditModal(false);
+      
+      // Note: Real-time subscription will automatically update the UI
+      // But we can also manually refresh to ensure consistency
+      await fetchProjects();
+    } catch (error) {
+      console.error('❌ Error updating project:', error);
+      alert('Failed to update project. Check console for details.');
+    } finally {
+      setLoading(false);
     }
   };
 
-  // Save new project
-  const handleSaveNew = (e: React.FormEvent) => {
+  // Save new project with auto-refresh
+  const handleSaveNew = async (e: React.FormEvent) => {
     e.preventDefault();
-    const newProject = { ...formData, id: Date.now() } as Project;
-    setProjects(prev => [...prev, newProject]);
-    setShowNewModal(false);
+
+    try {
+      setLoading(true);
+      console.log('🆕 Creating new project...');
+      
+      const { data, errors } = await client.models.Project.create({
+        name: formData.name!,
+        description: formData.description,
+        team: formData.team!,
+        status: formData.status!,
+        priority: formData.priority!,
+        ahtImpact: formData.ahtImpact,
+        costSaving: formData.costSaving,
+        qualityImpact: formData.qualityImpact
+      });
+
+      if (errors) {
+        console.error('❌ Create errors:', errors);
+        alert('Failed to create project. Check console for details.');
+        return;
+      }
+
+      console.log('✅ Project created successfully:', data);
+      setShowNewModal(false);
+      
+      // Note: Real-time subscription will automatically update the UI
+      // But we can also manually refresh to ensure consistency
+      await fetchProjects();
+    } catch (error) {
+      console.error('❌ Error creating project:', error);
+      alert('Failed to create project. Check console for details.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Manual refresh button handler
+  const handleManualRefresh = async () => {
+    console.log('🔄 Manual refresh triggered');
+    await fetchProjects();
   };
 
   return (
@@ -209,14 +345,37 @@ function App() {
       <div className="header">
         <h1>AI Project Tracker</h1>
         <div className="header-actions">
+          <span className="auth-status" style={{ marginRight: '10px', fontSize: '12px' }}>
+            {authStatus}
+          </span>
           <button className="btn-logout">Logout</button>
           <button className="btn-import">Import Excel</button>
           <button className="btn-new-project" onClick={handleNewProject}>
             + New Project
           </button>
           <button className="btn-export">Export</button>
+          <button 
+            className="btn-refresh" 
+            onClick={handleManualRefresh}
+            disabled={loading}
+            style={{ marginLeft: '10px' }}
+          >
+            {loading ? '⏳ Refreshing...' : '🔄 Refresh'}
+          </button>
         </div>
       </div>
+
+      {/* Loading Indicator */}
+      {loading && (
+        <div style={{ 
+          padding: '10px', 
+          background: '#e3f2fd', 
+          textAlign: 'center',
+          fontWeight: 'bold'
+        }}>
+          ⏳ Loading data...
+        </div>
+      )}
 
       {/* Filters Section */}
       <div className="filters">
@@ -464,7 +623,9 @@ function App() {
 
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowEditModal(false)}>Cancel</button>
-                <button type="submit">Save Changes</button>
+                <button type="submit" disabled={loading}>
+                  {loading ? 'Saving...' : 'Save Changes'}
+                </button>
               </div>
             </form>
           </div>
@@ -545,7 +706,9 @@ function App() {
 
               <div className="modal-actions">
                 <button type="button" onClick={() => setShowNewModal(false)}>Cancel</button>
-                <button type="submit">Create Project</button>
+                <button type="submit" disabled={loading}>
+                  {loading ? 'Creating...' : 'Create Project'}
+                </button>
               </div>
             </form>
           </div>
